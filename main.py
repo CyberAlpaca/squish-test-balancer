@@ -15,6 +15,7 @@ from typing import Dict, List, Tuple
 
 import yaml
 
+import my_logger
 from my_logger import logger
 
 
@@ -147,7 +148,12 @@ def find_test_cases(test_cases_dir: str) -> List[TestCase]:
     return test_cases
 
 
-def main():
+def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments for the script.
+
+    Returns:
+        argparse.Namespace: Parsed command-line arguments.
+    """
     parser = argparse.ArgumentParser(
         description="Run Squish test cases distributed across multiple squishservers.",
         epilog="Example usage: python main.py /path/to/test_cases /path/to/config.yaml",
@@ -169,9 +175,36 @@ def main():
         "squishrunner_path: D:/Squish/bin/squishrunner\n",
     )
 
+    # Add an optional argument for verbosity
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Increase output verbosity",
+    )
+
+    # Parse the arguments
     args = parser.parse_args()
 
-    test_cases_dir = args.test_cases_dir
+    # Validate the test_cases_dir
+    if not Path(args.test_cases_dir).is_dir():
+        parser.error(
+            f"The specified test_cases_dir '{args.test_cases_dir}' does not exist or is not a directory."
+        )
+
+    # Validate the config_file
+    if not Path(args.config_file).is_file():
+        parser.error(
+            f"The specified config_file '{args.config_file}' does not exist or is not a file."
+        )
+
+    return args
+
+
+def main():
+    args = parse_args()
+    if args.verbose:
+        logger.setLevel(my_logger.logging.DEBUG)
 
     config = Config(args.config_file)
     squish_servers = config.squishservers()
@@ -180,7 +213,7 @@ def main():
         logger.error("No squishservers found in the provided YAML file.")
         sys.exit(1)
 
-    test_cases = find_test_cases(test_cases_dir)
+    test_cases = find_test_cases(args.test_cases_dir)
     if not test_cases:
         logger.error("No test cases found in the provided directory.")
         sys.exit(1)
