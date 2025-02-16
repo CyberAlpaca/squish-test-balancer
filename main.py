@@ -7,6 +7,7 @@
 import argparse
 import subprocess
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,7 +17,10 @@ from typing import Dict, List, Tuple
 import yaml
 
 import my_logger
+from historical_times import HistoricalTimes
 from my_logger import logger
+
+history = HistoricalTimes()
 
 
 @dataclass
@@ -77,8 +81,9 @@ class Config:
 
 def run_squish_test(
     test_case: TestCase, squish_server: SquishServer
-) -> Tuple[str, bool]:
+) -> Tuple[str, bool, float]:
     try:
+        start_time = time.time()
         command = (
             f"{Config().squishrunner_path} --host {squish_server.host} --port {squish_server.port} "
             f"--testsuite {test_case.suite} --testcase {test_case.name} "
@@ -87,22 +92,33 @@ def run_squish_test(
         logger.info(f"Execute {test_case}")
         logger.debug(f"Running command: {command}")
         subprocess.run(command, shell=True, check=True)
-        return (str(test_case), True)
+        end_time = time.time()
+        execution_time = end_time - start_time
+
+        history.update_historical_time(test_case.name, execution_time)
+
+        return (str(test_case), True, execution_time)
 
     except subprocess.CalledProcessError as e:
+        end_time = time.time()
+        execution_time = end_time - start_time
+
+        history.update_historical_time(test_case.name, execution_time)
+
         if e.returncode == 44:
             logger.debug(f"Test case {test_case} failed on server {squish_server}: {e}")
-            return (str(test_case), False)
+            return (str(test_case), False, execution_time)
         else:
             logger.error(
                 f"Test case {test_case} encountered an unexpected error on server {squish_server}: \n{e}"
             )
-            return (str(test_case), False)
+            return (str(test_case), False, execution_time)
 
 
 def distribute_tests(
-    test_cases: List[TestCase], squish_servers: List[SquishServer]
-) -> Dict[TestCase, bool]:
+    test_cases: List[TestCase],
+    squish_servers: List[SquishServer],
+) -> Dict[TestCase, Tuple[bool, str, float]]:
     results = {}
     test_case_queue = Queue()
     server_test_counts = {str(server): 0 for server in squish_servers}
@@ -115,7 +131,7 @@ def distribute_tests(
             try:
                 test_case = test_case_queue.get_nowait()
                 result = run_squish_test(test_case, server)
-                results[test_case] = [result[1], str(server)]
+                results[test_case] = [result[1], str(server), result[2]]
                 server_test_counts[str(server)] += 1
                 test_case_queue.task_done()
             except Exception as e:
@@ -201,6 +217,20 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
+def sort_test_cases_by_execution_time(test_cases: List[TestCase]) -> List[TestCase]:
+    """
+    Sort test cases by their historical execution time (longest first).
+
+    :param test_cases: List of TestCase objects to sort.
+    :return: List of TestCase objects sorted by execution time (longest first).
+    """
+    return sorted(
+        test_cases,
+        key=lambda tc: history.get_execution_time(tc.name),
+        reverse=True,  # Sort in descending order (longest first)
+    )
+
+
 def main():
     args = parse_args()
     if args.verbose:
@@ -217,15 +247,29 @@ def main():
     if not test_cases:
         logger.error("No test cases found in the provided directory.")
         sys.exit(1)
+    # Sort test cases by execution time (longest first)
+    sorted_test_cases = sort_test_cases_by_execution_time(test_cases)
+
+    # Print sorted test cases
+    for test_case in sorted_test_cases:
+        logger.info(
+            f"Test Case: {test_case.name}"
+            f"Historical Execution Time: {history.get_execution_time(test_case.name) or 'N/A'}"
+        )
 
     results = distribute_tests(test_cases, squish_servers)
+    history.save_historical_times()
 
     logger.info("Test execution results:")
     for test_case, result in results.items():
         if result[0]:
-            logger.info(f"\x1b[32;20mPASS\x1b[0m {result[1]} {test_case}")
+            logger.info(
+                f"\x1b[32;20mPASS\x1b[0m {result[1]} {test_case} ({result[2]:.2f}s)"
+            )
         else:
-            logger.info(f"\x1b[31;20mFAIL\x1b[0m {result[1]} {test_case}")
+            logger.info(
+                f"\x1b[31;20mFAIL\x1b[0m {result[1]} {test_case} ({result[2]:.2f}s)"
+            )
 
 
 if __name__ == "__main__":
