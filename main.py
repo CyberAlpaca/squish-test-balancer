@@ -226,7 +226,7 @@ def sort_test_cases_by_execution_time(test_cases: List[TestCase]) -> List[TestCa
     """
     return sorted(
         test_cases,
-        key=lambda tc: history.get_execution_time(tc.name),
+        key=lambda tc: history.get_average_execution_time(tc.name),
         reverse=True,  # Sort in descending order (longest first)
     )
 
@@ -252,9 +252,9 @@ def main():
 
     # Print sorted test cases
     for test_case in sorted_test_cases:
+        avg_time = history.get_average_execution_time(test_case.name)
         logger.info(
-            f"Test Case: {test_case.name}"
-            f"Historical Execution Time: {history.get_execution_time(test_case.name) or 'N/A'}"
+            f"Test Case: {test_case.name}, " f"Average Execution Time: {avg_time:.2f}s"
         )
 
     results = distribute_tests(test_cases, squish_servers)
