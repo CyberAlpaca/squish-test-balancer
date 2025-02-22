@@ -58,25 +58,35 @@ class Config:
                 logger.debug(f"Loading config file: {config_file}")
                 self.config = yaml.safe_load(file)
                 # Load Squish servers
-                self.squish_servers = []
+                self._squish_servers = []
                 for server in self.config.get("squish_servers", []):
                     logger.debug(f"Found server: {server}")
                     host, port = server.split(":")
-                    self.squish_servers.append(SquishServer(host, int(port)))
+                    self._squish_servers.append(SquishServer(host, int(port)))
 
                 # Load squishrunner path
-                self.squishrunner_path = self.config.get("squishrunner_path")
+                self._squishrunner_path = self.config.get("squishrunner_path")
                 logger.debug(f"Using squishrunner: {self.squishrunner_path}")
+
+                # Load test suites directory
+                self._test_suites_dir = self.config.get("test_suites_dir")
+                logger.debug(f"Test suites directory: {self.test_suites_dir}")
 
         except Exception as e:
             logger.error(f"Error loading config file {config_file}: {e}")
             sys.exit(1)
 
+    @property
     def squishservers(self) -> List[SquishServer]:
-        return self.squish_servers
+        return self._squish_servers
 
+    @property
     def squishrunner_path(self) -> str:
-        return self.squishrunner_path
+        return self._squishrunner_path
+
+    @property
+    def test_suites_dir(self) -> str:
+        return self._test_suites_dir
 
 
 def run_squish_test(
@@ -151,10 +161,10 @@ def distribute_tests(
     return results
 
 
-def find_test_cases(test_cases_dir: str) -> List[TestCase]:
-    logger.debug(f"Finding test cases in {test_cases_dir}")
+def find_test_cases(test_suites_dir: str) -> List[TestCase]:
+    logger.debug(f"Finding test cases in {test_suites_dir}")
     test_cases = []
-    test_cases_path = Path(test_cases_dir)
+    test_cases_path = Path(test_suites_dir)
 
     for test_case_path in test_cases_path.rglob("tst_*"):
         if test_case_path.is_dir():
@@ -172,23 +182,21 @@ def parse_args() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(
         description="Run Squish test cases distributed across multiple squishservers.",
-        epilog="Example usage: python main.py /path/to/test_cases /path/to/config.yaml",
+        epilog="Example usage: python main.py /path/to/test_suites /path/to/config.yaml",
     )
 
     parser.add_argument(
-        "test_cases_dir",
+        "test_suites_dir",
         type=str,
-        help="Directory containing the Squish test cases (directories starting with tst_)",
+        nargs="?",
+        default=None,
+        help="Directory containing the Squish test suites",
     )
 
     parser.add_argument(
         "config_file",
         type=str,
-        help="Path to the config file. Example YAML structure:\n"
-        "squish_servers:\n"
-        "  - 192.168.1.100:4432\n"
-        "  - 192.168.1.100:4433\n"
-        "squishrunner_path: D:/Squish/bin/squishrunner\n",
+        help="Path to the config file.",
     )
 
     # Add an optional argument for verbosity
@@ -202,10 +210,22 @@ def parse_args() -> argparse.Namespace:
     # Parse the arguments
     args = parser.parse_args()
 
-    # Validate the test_cases_dir
-    if not Path(args.test_cases_dir).is_dir():
+    # Load config to get the default test_suites_dir
+    config = Config(args.config_file)
+
+    # If test_suites_dir is not provided via command line, use the one from config
+    if args.test_suites_dir is None:
+        if config.test_suites_dir is None:
+            logger.error(
+                "No test suites directory provided via command line or config file."
+            )
+            sys.exit(1)
+        args.test_suites_dir = config.test_suites_dir
+
+    # Validate the test_suites_dir
+    if not Path(args.test_suites_dir).is_dir():
         parser.error(
-            f"The specified test_cases_dir '{args.test_cases_dir}' does not exist or is not a directory."
+            f"The specified test_suites_dir '{args.test_suites_dir}' does not exist or is not a directory."
         )
 
     # Validate the config_file
@@ -237,13 +257,13 @@ def main():
         logger.setLevel(my_logger.logging.DEBUG)
 
     config = Config(args.config_file)
-    squish_servers = config.squishservers()
+    squish_servers = config.squishservers
 
     if not squish_servers:
         logger.error("No squishservers found in the provided YAML file.")
         sys.exit(1)
 
-    test_cases = find_test_cases(args.test_cases_dir)
+    test_cases = find_test_cases(args.test_suites_dir)
     if not test_cases:
         logger.error("No test cases found in the provided directory.")
         sys.exit(1)
@@ -256,7 +276,6 @@ def main():
         logger.info(
             f"Test Case: {test_case.name}, " f"Average Execution Time: {avg_time:.2f}s"
         )
-
     results = distribute_tests(test_cases, squish_servers)
     history.save_historical_times()
 
