@@ -16,9 +16,8 @@ from typing import Dict, List, Tuple
 
 import yaml
 
-import my_logger
 from historical_times import HistoricalTimes
-from my_logger import logger
+from logger import logger
 
 history = HistoricalTimes()
 
@@ -254,7 +253,7 @@ def sort_test_cases_by_execution_time(test_cases: List[TestCase]) -> List[TestCa
 def main():
     args = parse_args()
     if args.verbose:
-        logger.setLevel(my_logger.logging.DEBUG)
+        logger.setLevel(logger.logging.DEBUG)
 
     config = Config(args.config_file)
     squish_servers = config.squishservers
@@ -277,7 +276,7 @@ def main():
             f"Test Case: {test_case.name}, " f"Average Execution Time: {avg_time:.2f}s"
         )
     results = distribute_tests(test_cases, squish_servers)
-    history.save_historical_times()
+    history.save_execution_history()
 
     logger.info("Test execution results:")
     for test_case, result in results.items():
