@@ -1,6 +1,6 @@
-# Squish Test Distributor
+# Squish Test Balancer
 
-The **Squish Test Distributor** is a Python-based tool designed to distribute and execute Squish test cases across multiple Squish servers efficiently. It leverages historical execution times to optimize the distribution of test cases, ensuring that longer-running tests are prioritized and balanced across available servers. This tool is particularly useful for teams running large test suites and looking to reduce overall execution time.
+The **Squish Test Balancer** is a Python-based tool designed to distribute and execute Squish test cases across multiple Squish servers efficiently. It leverages historical execution times to optimize the distribution of test cases, ensuring that longer-running tests are prioritized and balanced across available servers. This tool is particularly useful for teams running large test suites and looking to reduce overall execution time.
 
 ## Features
 
@@ -14,8 +14,8 @@ The **Squish Test Distributor** is a Python-based tool designed to distribute an
 
 1. **Clone the Repository**:
    ```bash
-   git clone https://github.com/CyberAlpaca/squish-test-distributor.git
-   cd squish-test-distributor
+   git clone https://github.com/CyberAlpaca/squish-test-balancer.git
+   cd squish-test-balancer
    ```
 
 2. **Python Installation**:
@@ -35,10 +35,10 @@ The **Squish Test Distributor** is a Python-based tool designed to distribute an
 
 ## Usage
 
-Run the distributor with the following command:
+Run the balancer with the following command:
 
 ```bash
-python main.py /path/to/config.yaml
+python stb.py /path/to/config.yaml
 ```
 
 ### Command-Line Arguments
@@ -50,7 +50,7 @@ python main.py /path/to/config.yaml
 ### Example
 
 ```bash
-python main.py /path/to/config.yaml --verbose
+python stb.py /path/to/config.yaml --verbose
 ```
 
 ## Historical Execution Times
@@ -71,7 +71,7 @@ This project is licensed under the BSD 3-Clause License. See the [LICENSE](LICEN
 
 ## Support
 
-For any issues or questions, please open an issue on the [GitHub repository](https://github.com/CyberAlpaca/squish-test-distributor/issues).
+For any issues or questions, please open an issue on the [GitHub repository](https://github.com/CyberAlpaca/squish-test-balancer/issues).
 
 ---
 
